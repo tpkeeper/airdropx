@@ -1,0 +1,11 @@
+AirDropXContractAddress = "0x9fBb1680138eaC7Af94F58E791c1211aE641C3b8"
+ChainId = 3
+EthApi = "https://ropsten.infura.io/v3/xxxx"
+ExcelFilePath = "./example.xlsx"
+GasLimit = 20
+LogFilePath = ""
+Seed = "0xxxxxxx"
+SheetName = "Winner"
+StartIndex = 4970
+TokenContractAddress = "0x73d6167A3321856937C8200FF0c990Ef6cb10fE6"
+TransNumberLimit = 50
