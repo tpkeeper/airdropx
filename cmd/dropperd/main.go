@@ -32,6 +32,7 @@ func _main() error {
 	if err != nil {
 		return err
 	}
+	logrus.Infof("config: %+v", cfg)
 	log.InitLogFile(cfg.LogFilePath)
 	f, err := excelize.OpenFile(cfg.ExcelFilePath)
 	if err != nil {
@@ -55,7 +56,7 @@ func _main() error {
 		panic(err)
 	}
 	rowsLen := len(rows)
-	logrus.Println("rows len", rowsLen)
+	logrus.Println("address rows len", rowsLen)
 
 	totalAmount := big.NewInt(0)
 	willTrans := make([]TransInfo, 0)
@@ -158,7 +159,10 @@ out:
 	for {
 		select {
 		case transInfo := <-transInfoChan:
-			logrus.Info("transInfo")
+			logrus.Info("will send transInfo: ", transInfo)
+			logrus.Info("will send after 6 seconds...")
+			time.Sleep(time.Second * 6)
+
 			willUseAddrList := make([]common.Address, len(transInfo))
 			willUseAmountList := make([]*big.Int, len(transInfo))
 			for i, t := range transInfo {
@@ -173,6 +177,7 @@ out:
 				if err != nil {
 					return err
 				}
+				logrus.Info("suggest gas price: ", willUseGasPrice)
 				willUseGasPrice = new(big.Int).Add(willUseGasPrice, big.NewInt(5e9))
 				if willUseGasPrice.Cmp(gasPriceLimit) > 0 {
 					time.Sleep(time.Second * 5)
@@ -182,6 +187,7 @@ out:
 				}
 			}
 			transacOpts.GasPrice = willUseGasPrice
+			logrus.Info("final use gas price: ", willUseGasPrice)
 
 			tx, err := contractAirdrop.HelpTransfer(
 				&transacOpts,

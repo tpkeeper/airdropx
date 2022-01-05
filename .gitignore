@@ -2,6 +2,7 @@
 /log_data/
 /build/
 /contract/artifacts/
+contract/contracts/artifacts/
 /contract/build/
 /contract/node_modules/
 /contract/cache/
