@@ -34,11 +34,16 @@ func _main() error {
 	}
 	logrus.Infof("config: %+v", cfg)
 	log.InitLogFile(cfg.LogFilePath)
+
 	f, err := excelize.OpenFile(cfg.ExcelFilePath)
 	if err != nil {
 		return err
 	}
 	client, err := ethclient.Dial(cfg.EthApi)
+	if err != nil {
+		return err
+	}
+	chainId, err := client.ChainID(context.Background())
 	if err != nil {
 		return err
 	}
@@ -51,12 +56,30 @@ func _main() error {
 		return err
 	}
 
+	increaseGas := big.NewInt(cfg.IncreaseGas * 1e9)
+
+	callOpts := &bind.CallOpts{
+		BlockNumber: nil,
+		Context:     context.Background(),
+	}
+	symbol, err := contractErc20.Symbol(callOpts)
+	if err != nil {
+		return err
+	}
+	logrus.Infof("token symbol: %s", symbol)
+	decimals, err := contractErc20.Decimals(callOpts)
+	if err != nil {
+		return err
+	}
+	decimalsDeci := decimal.New(1, int32(decimals))
+	logrus.Infof("token decimals: %d", decimals)
+
 	rows, err := f.GetRows(cfg.SheetName)
 	if err != nil {
 		panic(err)
 	}
 	rowsLen := len(rows)
-	logrus.Println("address rows len", rowsLen)
+	logrus.Infof("address rows len: %d", rowsLen)
 
 	totalAmount := big.NewInt(0)
 	willTrans := make([]TransInfo, 0)
@@ -72,7 +95,7 @@ func _main() error {
 		if err != nil {
 			return err
 		}
-		amountBig := amountDec.Mul(decimal.New(1, 18)).BigInt()
+		amountBig := amountDec.Mul(decimalsDeci).BigInt()
 		newTransInfo := TransInfo{
 			Address: addr,
 			Amount:  amountBig,
@@ -98,19 +121,12 @@ func _main() error {
 	transacOpts := bind.TransactOpts{
 		From: from,
 		Signer: func(addr common.Address, tx *types.Transaction) (*types.Transaction, error) {
-			return signTx(tx, privKeyBts, cfg.ChainId)
+			return signTx(tx, privKeyBts, chainId)
 		},
 		Context: context.Background(),
 	}
 
-	callOpts := bind.CallOpts{
-		Pending:     false,
-		From:        from,
-		BlockNumber: nil,
-		Context:     context.Background(),
-	}
-
-	allowance, err := contractErc20.Allowance(&callOpts, from,
+	allowance, err := contractErc20.Allowance(callOpts, from,
 		common.HexToAddress(cfg.AirDropXContractAddress))
 	if err != nil {
 		return err
@@ -124,7 +140,7 @@ func _main() error {
 			if err != nil {
 				return err
 			}
-			willUseGasPrice = new(big.Int).Add(willUseGasPrice, big.NewInt(5e9))
+			willUseGasPrice = new(big.Int).Add(willUseGasPrice, increaseGas)
 			if willUseGasPrice.Cmp(gasPriceLimit) > 0 {
 				time.Sleep(time.Second * 5)
 				continue
@@ -178,7 +194,7 @@ out:
 					return err
 				}
 				logrus.Info("suggest gas price: ", willUseGasPrice)
-				willUseGasPrice = new(big.Int).Add(willUseGasPrice, big.NewInt(5e9))
+				willUseGasPrice = new(big.Int).Add(willUseGasPrice, increaseGas)
 				if willUseGasPrice.Cmp(gasPriceLimit) > 0 {
 					time.Sleep(time.Second * 5)
 					continue
@@ -231,10 +247,10 @@ func main() {
 	}
 }
 
-func signTx(rawTx *types.Transaction, privateKeyBts []byte, chainId int64) (signedTx *types.Transaction, err error) {
+func signTx(rawTx *types.Transaction, privateKeyBts []byte, chainId *big.Int) (signedTx *types.Transaction, err error) {
 	privKey, _ := btcec.PrivKeyFromBytes(btcec.S256(), privateKeyBts)
 	// Sign the transaction and verify the sender to avoid hardware fault surprises
-	signer := types.NewEIP155Signer(big.NewInt(int64(chainId)))
+	signer := types.NewEIP155Signer(chainId)
 	signedTx, err = types.SignTx(rawTx, signer, privKey.ToECDSA())
 	return
 }

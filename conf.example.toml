@@ -1,8 +1,8 @@
 AirDropXContractAddress = "0x9fBb1680138eaC7Af94F58E791c1211aE641C3b8"
-ChainId = 3
 EthApi = "https://ropsten.infura.io/v3/xxxx"
 ExcelFilePath = "./example.xlsx"
 GasLimit = 20
+IncreaseGas = 5
 LogFilePath = ""
 Seed = "0xxxxxxx"
 SheetName = "Winner"

@@ -15,8 +15,8 @@ type Config struct {
 	TokenContractAddress    string
 	StartIndex              uint64
 	TransNumberLimit        uint64
-	ChainId                 int64
-	GasLimit                int64
+	GasLimit                int64 //Gwei
+	IncreaseGas             int64 //Gwei
 	Seed                    string
 	LogFilePath             string
 }
