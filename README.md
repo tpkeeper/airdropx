@@ -1,9 +1,29 @@
 # airdropx
 
-airdop tool for erc20 token
+airdop tool for erc20 token.
 
-* deploy airdropx contract need gas: 406,894
+fast, stable and secure. 
 
-* transfer erc20 token to 100 addresses with aridropx in 1 tx need gas: 2,855,985
+Has been used many times in practice.
 
-* transfer erc20 token to 1 address directly need gas 29,935;
+## use step
+
+1 use main account deploy `AirDroX.sol`
+
+2 send erc20 token to main account
+
+3 config `conf.toml` refer to `conf.exmaple.toml`
+
+4 config `xxx.xlsx` refer to `example.xlsx`
+
+5 `./build/dropperd -C conf.toml`
+
+6 just wait
+
+## notice
+
+deploy airdropx contract need gas: 406,894
+
+transfer erc20 token to 100 addresses with aridropx in 1 tx need gas: 2,855,985
+
+transfer erc20 token to 1 address directly need gas 29,935;

@@ -31,6 +31,9 @@ func Load() (*Config, error) {
 	if cfg.LogFilePath == "" {
 		cfg.LogFilePath = "./log_data"
 	}
+	if cfg.TransNumberLimit == 0 {
+		return nil, fmt.Errorf("transNumberLimit can not be zero")
+	}
 
 	return &cfg, nil
 }

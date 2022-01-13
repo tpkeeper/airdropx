@@ -27,7 +27,6 @@ type TransInfo struct {
 }
 
 func _main() error {
-	var transInfoChan = make(chan []TransInfo, 1024)
 	cfg, err := config.Load()
 	if err != nil {
 		return err
@@ -79,7 +78,8 @@ func _main() error {
 		panic(err)
 	}
 	rowsLen := len(rows)
-	logrus.Infof("address rows len: %d", rowsLen)
+	logrus.Infof("address number: %d", rowsLen)
+	transInfoChan := make(chan []TransInfo, rowsLen/int(cfg.TransNumberLimit)+1)
 
 	totalAmount := big.NewInt(0)
 	willTrans := make([]TransInfo, 0)
@@ -132,6 +132,7 @@ func _main() error {
 		return err
 	}
 
+	// check approve needed
 	if totalAmount.Cmp(allowance) > 0 {
 		var willUseGasPrice *big.Int
 		var err error
