@@ -43,7 +43,7 @@ build:
 
 bind:
 	@echo "  >  \033[32mBind contract...\033[0m "
-	abigen --abi ./contract_binds/airdropx/AirDropX.json --pkg contract_airdropx --type AirDropX --out ./contract_binds/airdropx/airdropx.go
+	abigen --abi ./contract_binds/airdropx/AirDropX.json --bin ./contract_binds/airdropx/airdropx.bin --pkg contract_airdropx --type AirDropX --out ./contract_binds/airdropx/airdropx.go
 
 ## license: Adds license header to missing files.
 license:

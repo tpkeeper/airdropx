@@ -8,17 +8,16 @@ import (
 )
 
 type Config struct {
-	EthApi                  string
-	ExcelFilePath           string
-	SheetName               string
-	AirDropXContractAddress string
-	TokenContractAddress    string
-	StartIndex              uint64
-	TransNumberLimit        uint64
-	GasLimit                int64 //Gwei
-	IncreaseGas             int64 //Gwei
-	Seed                    string
-	LogFilePath             string
+	EthApi               string
+	ExcelFilePath        string
+	SheetName            string
+	TokenContractAddress string
+	StartIndex           uint64
+	TransNumberLimit     uint64
+	GasLimit             int64 //Gwei
+	IncreaseGas          int64 //Gwei
+	Seed                 string
+	LogFilePath          string
 }
 
 func Load() (*Config, error) {

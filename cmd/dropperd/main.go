@@ -6,6 +6,7 @@ import (
 	"airdropx/contract_binds/erc20"
 	"airdropx/log"
 	"context"
+	"fmt"
 	"math/big"
 	"time"
 
@@ -20,6 +21,8 @@ import (
 	"github.com/shopspring/decimal"
 	"github.com/sirupsen/logrus"
 )
+
+const oneGwei = 1e9
 
 type TransInfo struct {
 	Address common.Address
@@ -42,25 +45,76 @@ func _main() error {
 	if err != nil {
 		return err
 	}
+
 	chainId, err := client.ChainID(context.Background())
 	if err != nil {
 		return err
 	}
-	contractAirdrop, err := contract_airdropx.NewAirDropX(common.HexToAddress(cfg.AirDropXContractAddress), client)
+	callOpts := &bind.CallOpts{
+		BlockNumber: nil,
+		Context:     context.Background(),
+	}
+	privKeyBts, err := hexutil.Decode(cfg.Seed)
 	if err != nil {
 		return err
 	}
+
+	_, pubKey := btcec.PrivKeyFromBytes(btcec.S256(), privKeyBts)
+	from := crypto.PubkeyToAddress(*pubKey.ToECDSA())
+	gasPriceLimit := new(big.Int).Mul(big.NewInt(cfg.GasLimit), big.NewInt(oneGwei))
+	increaseGas := big.NewInt(cfg.IncreaseGas * oneGwei)
+
+	transacOpts := bind.TransactOpts{
+		From: from,
+		Signer: func(addr common.Address, tx *types.Transaction) (*types.Transaction, error) {
+			return signTx(tx, privKeyBts, chainId)
+		},
+		Context: context.Background(),
+	}
+
+	var willUseGasPrice *big.Int
+	for {
+		willUseGasPrice, err = client.SuggestGasPrice(context.Background())
+		if err != nil {
+			return err
+		}
+		logrus.Info("suggest gas price: ", new(big.Int).Div(willUseGasPrice, big.NewInt(oneGwei)))
+		willUseGasPrice = new(big.Int).Add(willUseGasPrice, increaseGas)
+		if willUseGasPrice.Cmp(gasPriceLimit) > 0 {
+			time.Sleep(time.Second * 5)
+			continue
+		} else {
+			break
+		}
+	}
+	transacOpts.GasPrice = willUseGasPrice
+	logrus.Info("final use gas price: ", new(big.Int).Div(willUseGasPrice, big.NewInt(oneGwei)))
+	airdropAddress, tx, contractAirdrop, err := contract_airdropx.DeployAirDropX(&transacOpts, client)
+	if err != nil {
+		return fmt.Errorf("deploy err: %s", err.Error())
+	}
+	logrus.Info("deploy contract tx hash: ", tx.Hash().String())
+	for {
+		_, pending, err := client.TransactionByHash(context.Background(), tx.Hash())
+		if err == nil && !pending {
+			break
+		} else {
+			if err != nil {
+				logrus.Info(" tx status: ", err)
+			} else {
+				logrus.Info("tx status: is pending...")
+			}
+			time.Sleep(time.Second * 8)
+			continue
+		}
+	}
+	logrus.Info("deploy contract tx ok: ", tx.Hash().String())
+
 	contractErc20, err := contract_erc20.NewErc20(common.HexToAddress(cfg.TokenContractAddress), client)
 	if err != nil {
 		return err
 	}
 
-	increaseGas := big.NewInt(cfg.IncreaseGas * 1e9)
-
-	callOpts := &bind.CallOpts{
-		BlockNumber: nil,
-		Context:     context.Background(),
-	}
 	symbol, err := contractErc20.Symbol(callOpts)
 	if err != nil {
 		return err
@@ -109,25 +163,7 @@ func _main() error {
 	}
 	logrus.Info("transInfoChan len: ", len(transInfoChan))
 
-	privKeyBts, err := hexutil.Decode(cfg.Seed)
-	if err != nil {
-		return err
-	}
-
-	_, pubKey := btcec.PrivKeyFromBytes(btcec.S256(), privKeyBts)
-	from := crypto.PubkeyToAddress(*pubKey.ToECDSA())
-	gasPriceLimit := new(big.Int).Mul(big.NewInt(cfg.GasLimit), big.NewInt(1e9))
-
-	transacOpts := bind.TransactOpts{
-		From: from,
-		Signer: func(addr common.Address, tx *types.Transaction) (*types.Transaction, error) {
-			return signTx(tx, privKeyBts, chainId)
-		},
-		Context: context.Background(),
-	}
-
-	allowance, err := contractErc20.Allowance(callOpts, from,
-		common.HexToAddress(cfg.AirDropXContractAddress))
+	allowance, err := contractErc20.Allowance(callOpts, from, airdropAddress)
 	if err != nil {
 		return err
 	}
@@ -150,7 +186,7 @@ func _main() error {
 			}
 		}
 		transacOpts.GasPrice = willUseGasPrice
-		tx, err := contractErc20.Approve(&transacOpts, common.HexToAddress(cfg.AirDropXContractAddress), totalAmount)
+		tx, err := contractErc20.Approve(&transacOpts, airdropAddress, totalAmount)
 		if err != nil {
 			return err
 		}
@@ -194,7 +230,7 @@ out:
 				if err != nil {
 					return err
 				}
-				logrus.Info("suggest gas price: ", willUseGasPrice)
+				logrus.Info("suggest gas price: ", new(big.Int).Div(willUseGasPrice, big.NewInt(oneGwei)))
 				willUseGasPrice = new(big.Int).Add(willUseGasPrice, increaseGas)
 				if willUseGasPrice.Cmp(gasPriceLimit) > 0 {
 					time.Sleep(time.Second * 5)
@@ -204,7 +240,7 @@ out:
 				}
 			}
 			transacOpts.GasPrice = willUseGasPrice
-			logrus.Info("final use gas price: ", willUseGasPrice)
+			logrus.Info("final use gas price: ", new(big.Int).Div(willUseGasPrice, big.NewInt(oneGwei)))
 
 			tx, err := contractAirdrop.HelpTransfer(
 				&transacOpts,
