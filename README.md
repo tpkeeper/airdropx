@@ -8,13 +8,13 @@ Has been used many times in practice.
 
 ## use step
 
-1 use main account deploy `AirDroX.sol`
+1 prepare an account with enough gas
 
-2 send erc20 token to main account
+2 send erc20 token to this account
 
-3 config `conf.toml` refer to `conf.exmaple.toml`
+3 config `conf.toml`
 
-4 config `xxx.xlsx` refer to `example.xlsx`
+4 config `xxx.xlsx`
 
 5 `./build/dropperd -C conf.toml`
 
