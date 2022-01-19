@@ -72,6 +72,64 @@ func _main() error {
 		Context: context.Background(),
 	}
 
+	// == prepare erc20 info
+	contractErc20, err := contract_erc20.NewErc20(common.HexToAddress(cfg.TokenContractAddress), client)
+	if err != nil {
+		return err
+	}
+
+	symbol, err := contractErc20.Symbol(callOpts)
+	if err != nil {
+		return err
+	}
+	logrus.Infof("token symbol: %s", symbol)
+	decimals, err := contractErc20.Decimals(callOpts)
+	if err != nil {
+		return err
+	}
+	decimalsDeci := decimal.New(1, int32(decimals))
+	logrus.Infof("token decimals: %d", decimals)
+
+	// ==== collect address
+	rows, err := f.GetRows(cfg.SheetName)
+	if err != nil {
+		panic(err)
+	}
+	rowsLen := len(rows)
+	logrus.Infof("address number: %d", rowsLen)
+	transInfoChan := make(chan []TransInfo, rowsLen/int(cfg.TransNumberLimit)+1)
+
+	totalAmount := big.NewInt(0)
+	willTrans := make([]TransInfo, 0)
+	for i, row := range rows {
+		if uint64(i) < cfg.StartIndex {
+			continue
+		}
+		if !common.IsHexAddress(row[0]) {
+			return err
+		}
+		addr := common.HexToAddress(row[0])
+		amountDec, err := decimal.NewFromString(row[1])
+		if err != nil {
+			return err
+		}
+		amountBig := amountDec.Mul(decimalsDeci).BigInt()
+		newTransInfo := TransInfo{
+			Address: addr,
+			Amount:  amountBig,
+		}
+		willTrans = append(willTrans, newTransInfo)
+		totalAmount = new(big.Int).Add(totalAmount, amountBig)
+		if uint64(len(willTrans)) >= cfg.TransNumberLimit || i == rowsLen-1 {
+			transInfoChan <- willTrans
+			willTrans = make([]TransInfo, 0)
+		}
+	}
+	logrus.Info("transInfoChan len: ", len(transInfoChan))
+	if len(transInfoChan) == 0 {
+		return nil
+	}
+	// ==== deploy contract
 	var willUseGasPrice *big.Int
 	for {
 		willUseGasPrice, err = client.SuggestGasPrice(context.Background())
@@ -110,64 +168,11 @@ func _main() error {
 	}
 	logrus.Info("deploy contract tx ok: ", tx.Hash().String())
 
-	contractErc20, err := contract_erc20.NewErc20(common.HexToAddress(cfg.TokenContractAddress), client)
-	if err != nil {
-		return err
-	}
-
-	symbol, err := contractErc20.Symbol(callOpts)
-	if err != nil {
-		return err
-	}
-	logrus.Infof("token symbol: %s", symbol)
-	decimals, err := contractErc20.Decimals(callOpts)
-	if err != nil {
-		return err
-	}
-	decimalsDeci := decimal.New(1, int32(decimals))
-	logrus.Infof("token decimals: %d", decimals)
-
-	rows, err := f.GetRows(cfg.SheetName)
-	if err != nil {
-		panic(err)
-	}
-	rowsLen := len(rows)
-	logrus.Infof("address number: %d", rowsLen)
-	transInfoChan := make(chan []TransInfo, rowsLen/int(cfg.TransNumberLimit)+1)
-
-	totalAmount := big.NewInt(0)
-	willTrans := make([]TransInfo, 0)
-	for i, row := range rows {
-		if uint64(i) < cfg.StartIndex {
-			continue
-		}
-		if !common.IsHexAddress(row[0]) {
-			return err
-		}
-		addr := common.HexToAddress(row[0])
-		amountDec, err := decimal.NewFromString(row[1])
-		if err != nil {
-			return err
-		}
-		amountBig := amountDec.Mul(decimalsDeci).BigInt()
-		newTransInfo := TransInfo{
-			Address: addr,
-			Amount:  amountBig,
-		}
-		willTrans = append(willTrans, newTransInfo)
-		totalAmount = new(big.Int).Add(totalAmount, amountBig)
-		if uint64(len(willTrans)) >= cfg.TransNumberLimit || i == rowsLen-1 {
-			transInfoChan <- willTrans
-			willTrans = make([]TransInfo, 0)
-		}
-	}
-	logrus.Info("transInfoChan len: ", len(transInfoChan))
-
+	// ====aprove
 	allowance, err := contractErc20.Allowance(callOpts, from, airdropAddress)
 	if err != nil {
 		return err
 	}
-
 	// check approve needed
 	if totalAmount.Cmp(allowance) > 0 {
 		var willUseGasPrice *big.Int
@@ -208,6 +213,7 @@ func _main() error {
 		logrus.Info("approve tx ok: ", tx.Hash().String())
 	}
 
+	// === send erc20
 out:
 	for {
 		select {

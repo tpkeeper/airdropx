@@ -22,8 +22,8 @@ Has been used many times in practice.
 
 ## notice
 
-deploy airdropx contract need gas: 406,894
+deploy airdropx contract need gas: 406,894(heco) / 570,880(bsc)
 
-transfer erc20 token to 100 addresses with aridropx in 1 tx need gas: 2,855,985
+transfer erc20 token to 100 addresses with aridropx in 1 tx need gas: 2,855,985(heco)/ 3,348,314(bsc)
 
 transfer erc20 token to 1 address directly need gas 29,935;
